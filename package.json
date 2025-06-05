@@ -31,9 +31,14 @@
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
     "@changesets/cli": "^2.28.1",
+    "@types/json-pointer": "^1.0.34",
     "bunchee": "^6.4.0",
     "typescript": "^5.8.2",
     "vitest": "^3.0.7"
   },
-  "packageManager": "yarn@4.9.2"
+  "packageManager": "yarn@4.9.2",
+  "dependencies": {
+    "json-pointer": "^0.6.2",
+    "jsonpath-plus": "^10.3.0"
+  }
 }
