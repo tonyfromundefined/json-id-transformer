@@ -144,6 +144,7 @@ A map where keys are JSONPath expressions and values define the type of the ID t
     ```
 
     ```typescript
+    {
       "$.items[*]": (obj) => (
         obj.type === "user"
           ? { typename: "User", idPropertyName: "userId" }
