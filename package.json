@@ -1,6 +1,6 @@
 {
   "name": "json-id-transformer",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "A flexible utility library designed to batch transform specific IDs within a JSON object.",
   "keywords": [
     "json",
