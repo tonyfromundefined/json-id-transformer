@@ -124,15 +124,32 @@ A map where keys are JSONPath expressions and values define the type of the ID t
 
 *   **String Value**: Directly specifies the `typename` for the ID at the given JSONPath. The `idPropertyName` defaults to `"id"`.
     ```typescript
-    "$.users[*]": "User" // 'id' field of objects in 'users' array will be treated as 'User' type
+    {
+      // 'id' field of objects in 'users' array will be treated as 'User' type
+      "$.users[*]": "User"
+    }
     ```
 *   **Object Value**: Allows explicit specification of `typename` along with `idPropertyName`.
     ```typescript
-    "$.products[*]": { typename: "Product", idPropertyName: "productId" } // 'productId' field of objects in 'products' array will be treated as 'Product' type
+    {
+      // 'productId' field of objects in 'products' array will be treated as 'Product' type
+      "$.products[*]": { typename: "Product", idPropertyName: "productId" }
+    }
     ```
 *   **Function Value**: Used when the `typename` needs to be determined dynamically based on the object's content. The function receives the current object and its JSONPath as arguments.
     ```typescript
-    "$.items[*]": (obj) => (obj as { type: string }).type === "user" ? "User" : "Post"
+    {
+      "$.items[*]": (obj) => obj.type === "user" ? "User" : "Post"
+    }
+    ```
+
+    ```typescript
+      "$.items[*]": (obj) => (
+        obj.type === "user"
+          ? { typename: "User", idPropertyName: "userId" }
+          : { typename: "Post", idPropertyName: "postId" }
+      )
+    }
     ```
 
 #### `options.batchIds: BatchIdsFn`
