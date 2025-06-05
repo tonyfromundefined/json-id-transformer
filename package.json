@@ -7,26 +7,16 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
-    },
-    "./add": {
-      "types": "./dist/add.d.ts",
-      "import": "./dist/add.js",
-      "require": "./dist/add.cjs"
-    },
-    "./delay": {
-      "types": "./dist/delay.d.ts",
-      "import": "./dist/delay.js",
-      "require": "./dist/delay.cjs"
-    },
-    "./camelizeSchema": {
-      "types": "./dist/camelizeSchema.d.ts",
-      "import": "./dist/camelizeSchema.js",
-      "require": "./dist/camelizeSchema.cjs"
     }
   },
   "scripts": {
     "build": "bunchee",
-    "release": "changeset publish"
+    "release": "changeset publish",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "json-pointer": "^0.6.2",
+    "jsonpath-plus": "^10.3.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
@@ -36,9 +26,5 @@
     "typescript": "^5.8.2",
     "vitest": "^3.0.7"
   },
-  "packageManager": "yarn@4.9.2",
-  "dependencies": {
-    "json-pointer": "^0.6.2",
-    "jsonpath-plus": "^10.3.0"
-  }
+  "packageManager": "yarn@4.9.2"
 }

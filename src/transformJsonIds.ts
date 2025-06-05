@@ -1,9 +1,9 @@
-import * as jsonPointer from "json-pointer";
+import jsonPointer from "json-pointer";
 import { JSONPath } from "jsonpath-plus";
 
 export type Nullable<T> = T | null | undefined;
 
-type PathTypeMapReturn =
+export type PathTypeMapReturn =
   | string
   | {
       typename: string;
@@ -25,11 +25,12 @@ export type TransformJsonIdsOptions = {
   pathTypeMap: PathTypeMap;
   batchIds: BatchIdsFn;
 };
-
-export async function transformJsonIds(
-  input: object,
+export type TransformJsonIds = <T extends object = object>(
+  input: T,
   options: TransformJsonIdsOptions,
-): Promise<object> {
+) => Promise<T>;
+
+export const transformJsonIds: TransformJsonIds = async (input, options) => {
   const clonedInput = structuredClone(input);
 
   const idsToBatch: Array<{
@@ -111,4 +112,4 @@ export async function transformJsonIds(
   }
 
   return clonedInput;
-}
+};
