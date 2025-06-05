@@ -1,6 +1,8 @@
 import jsonPointer from "json-pointer";
 import { JSONPath } from "jsonpath-plus";
 
+const DEFAULT_ID_PROPERTY_NAME = "id";
+
 export type Nullable<T> = T | null | undefined;
 
 /**
@@ -14,6 +16,7 @@ export type PathTypeMapReturn =
        * The type name associated with the ID (e.g., "User", "Post").
        */
       typename: string;
+
       /**
        * The name of the property that holds the ID within the object (e.g., "id", "userId", "productId").
        * Defaults to "id" if not specified.
@@ -170,7 +173,7 @@ export async function transformJsonIds<T extends object = object>(
         );
 
         let typename: string;
-        let idPropertyName = "id"; // Default ID property name
+        let idPropertyName = DEFAULT_ID_PROPERTY_NAME; // Default ID property name
 
         // Determine the typename and idPropertyName based on pathTypeMapValue.
         // If pathTypeMapValue is a function, execute it to get the actual value.
