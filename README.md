@@ -65,45 +65,46 @@ async function main() {
   });
 
   console.log(JSON.stringify(transformedJson, null, 2));
+
   /*
-  Example Output:
-  {
-    "users": [
-      {
-        "id": "mapped_456",
-        "@id": "123",
-        "name": "John Doe"
-      },
-      {
-        "id": "mapped_101",
-        "@id": "789",
-        "name": "Jane Smith"
-      }
-    ],
-    "posts": [
-      {
-        "id": "mapped_222",
-        "@id": "111",
-        "title": "My First Post",
-        "authorId": "mapped_456",
-        "@authorId": "123",
-        "comments": [
-          {
-            "id": "mapped_666",
-            "@id": "555",
-            "text": "Great post!"
-          }
-        ]
-      }
-    ],
-    "profile": {
-      "userId": "mapped_456",
-      "@userId": "123",
-      "settings": {
-        "theme": "dark"
+    Example Output:
+    {
+      "users": [
+        {
+          "id": "mapped_456",
+          "@id": "123",
+          "name": "John Doe"
+        },
+        {
+          "id": "mapped_101",
+          "@id": "789",
+          "name": "Jane Smith"
+        }
+      ],
+      "posts": [
+        {
+          "id": "mapped_222",
+          "@id": "111",
+          "title": "My First Post",
+          "authorId": "mapped_456",
+          "@authorId": "123",
+          "comments": [
+            {
+              "id": "mapped_666",
+              "@id": "555",
+              "text": "Great post!"
+            }
+          ]
+        }
+      ],
+      "profile": {
+        "userId": "mapped_456",
+        "@userId": "123",
+        "settings": {
+          "theme": "dark"
+        }
       }
     }
-  }
   */
 }
 
