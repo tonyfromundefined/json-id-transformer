@@ -206,4 +206,52 @@ describe("transformJsonIds", () => {
       { id: "111", typename: "Post" },
     ]);
   });
+
+  test("options.includeOriginalId가 true일 때 원본 ID 유지", async () => {
+    const input = {
+      users: [{ id: "123", name: "John" }],
+    };
+
+    const expected = {
+      users: [
+        {
+          id: "mapped_456",
+          "@id": "123", // 원본 ID가 @id 필드로 추가되는지 확인
+          name: "John",
+        },
+      ],
+    };
+
+    const result = await transformJsonIds(input, {
+      pathTypeMap: {
+        "$.users[*]": "User", // typename만 지정
+      },
+      batchIds: mockBatchIds,
+      includeOriginalId: true,
+    });
+
+    expect(result).toEqual(expected);
+  });
+
+  test("PathTypeMapReturn.idPropertyName을 사용하여 ID 속성 이름 변경", async () => {
+    const input = {
+      products: [{ productId: "123", name: "Laptop" }],
+    };
+
+    const expected = {
+      products: [{ productId: "mapped_456", name: "Laptop" }],
+    };
+
+    const result = await transformJsonIds(input, {
+      pathTypeMap: {
+        "$.products[*]": {
+          typename: "User",
+          idPropertyName: "productId",
+        },
+      },
+      batchIds: mockBatchIds,
+    });
+
+    expect(result).toEqual(expected);
+  });
 });
