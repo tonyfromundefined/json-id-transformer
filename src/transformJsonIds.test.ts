@@ -202,8 +202,8 @@ describe("transformJsonIds", () => {
     await transformJsonIds(input, spyOptions);
 
     expect(mockBatchIdsSpy).toHaveBeenCalledWith([
-      { id: "123", type: "User" },
-      { id: "111", type: "Post" },
+      { id: "123", typename: "User" },
+      { id: "111", typename: "Post" },
     ]);
   });
 });

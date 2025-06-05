@@ -40,14 +40,12 @@ export async function transformJsonIds(
   }> = [];
 
   for (const jsonPath in options.pathTypeMap) {
-    let pathTypeMapValue = options.pathTypeMap[jsonPath];
-
-    console.log(jsonPath);
-
     JSONPath({
       path: jsonPath,
       json: clonedInput,
       callback: (pointer: string) => {
+        let pathTypeMapValue = options.pathTypeMap[jsonPath];
+
         if (pointer === null || pointer === undefined) {
           return;
         }
@@ -73,7 +71,12 @@ export async function transformJsonIds(
           }
         }
 
-        const id = typeof obj === "string" ? obj : obj[idPropertyName];
+        const id = typeof obj === "string" ? obj : obj?.[idPropertyName];
+
+        if (!id) {
+          return;
+        }
+
         const idPropertyPointer =
           typeof obj === "string"
             ? `${pointer}`
@@ -94,10 +97,12 @@ export async function transformJsonIds(
     });
   }
 
-  const batchedIds = await options.batchIds(idsToBatch);
+  const batchedIds = await options.batchIds(
+    idsToBatch.map(({ id, typename }) => ({ id, typename })),
+  );
 
   for (let i = 0; i < idsToBatch.length; i++) {
-    const { pointer, idPropertyPointer } = idsToBatch[i];
+    const { idPropertyPointer } = idsToBatch[i];
     const mappedId = batchedIds[i];
 
     if (mappedId !== null && mappedId !== undefined) {
