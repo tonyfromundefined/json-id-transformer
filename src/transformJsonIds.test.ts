@@ -18,7 +18,7 @@ describe("transformJsonIds", () => {
     return entries.map((entry) => idMap[`${entry.typename}#${entry.id}`]);
   };
 
-  test("단일 사용자 객체의 ID 변환", async () => {
+  test("ID transformation for a single user object", async () => {
     const input = {
       users: [
         { id: "123", name: "John" },
@@ -43,7 +43,7 @@ describe("transformJsonIds", () => {
     expect(result).toEqual(expected);
   });
 
-  test("중첩된 객체의 ID 변환", async () => {
+  test("ID transformation for nested objects", async () => {
     const input = {
       posts: [
         {
@@ -82,7 +82,7 @@ describe("transformJsonIds", () => {
     expect(result).toEqual(expected);
   });
 
-  test("프로필 객체의 사용자 ID 변환", async () => {
+  test("User ID transformation for profile objects", async () => {
     const input = {
       profile: {
         user: "123",
@@ -110,7 +110,7 @@ describe("transformJsonIds", () => {
     expect(result).toEqual(expected);
   });
 
-  test("매핑되지 않은 ID는 그대로 유지", async () => {
+  test("Unmapped IDs remain unchanged", async () => {
     const input = {
       users: [{ id: "unknown_id", name: "Unknown" }],
     };
@@ -126,7 +126,7 @@ describe("transformJsonIds", () => {
     expect(result).toEqual(expected);
   });
 
-  test("함수형 pathTypeMap 테스트", async () => {
+  test("Functional pathTypeMap test", async () => {
     const input = {
       items: [
         { id: "123", type: "user", name: "John" },
@@ -152,7 +152,7 @@ describe("transformJsonIds", () => {
     expect(result).toEqual(expected);
   });
 
-  test("null과 undefined 값 처리", async () => {
+  test("Handling null and undefined values", async () => {
     const input = {
       users: [
         { id: "123", name: "John" },
@@ -181,7 +181,7 @@ describe("transformJsonIds", () => {
     expect(result).toEqual(expected);
   });
 
-  test("batchIds 함수가 올바른 entries를 받는지 확인", async () => {
+  test("Verify batchIds function receives correct entries", async () => {
     const mockBatchIdsSpy = vi
       .fn()
       .mockResolvedValue(["mapped_456", "mapped_222"]);
@@ -207,7 +207,7 @@ describe("transformJsonIds", () => {
     ]);
   });
 
-  test("options.includeOriginalId가 true일 때 원본 ID 유지", async () => {
+  test("Retain original ID when options.includeOriginalId is true", async () => {
     const input = {
       users: [{ id: "123", name: "John" }],
     };
@@ -233,7 +233,7 @@ describe("transformJsonIds", () => {
     expect(result).toEqual(expected);
   });
 
-  test("PathTypeMapReturn.idPropertyName을 사용하여 ID 속성 이름 변경", async () => {
+  test("Change ID property name using PathTypeMapReturn.idPropertyName", async () => {
     const input = {
       products: [{ productId: "123", name: "Laptop" }],
     };
@@ -250,6 +250,47 @@ describe("transformJsonIds", () => {
         },
       },
       batchIds: mockBatchIds,
+    });
+
+    expect(result).toEqual(expected);
+  });
+  test("Retain original ID when includeOriginalId is true for direct string ID", async () => {
+    const input = {
+      someId: "123",
+    };
+
+    const expected = {
+      someId: "mapped_456",
+      "@someId": "123",
+    };
+
+    const result = await transformJsonIds(input, {
+      pathTypeMap: {
+        "$.someId": "User",
+      },
+      batchIds: mockBatchIds,
+      includeOriginalId: true,
+    });
+
+    expect(result).toEqual(expected);
+  });
+
+  test("Use custom original ID property name for direct string ID", async () => {
+    const input = {
+      anotherId: "789",
+    };
+
+    const expected = {
+      anotherId: "mapped_101",
+      original_anotherId: "789",
+    };
+
+    const result = await transformJsonIds(input, {
+      pathTypeMap: {
+        "$.anotherId": "User",
+      },
+      batchIds: mockBatchIds,
+      includeOriginalId: (idPropertyName) => `original_${idPropertyName}`,
     });
 
     expect(result).toEqual(expected);
