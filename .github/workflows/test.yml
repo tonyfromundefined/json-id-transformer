@@ -1,0 +1,24 @@
+name: Run Tests
+
+on:
+  pull_request:
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repo
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18' # 프로젝트의 engines.node 버전에 맞춰 18로 설정
+
+    - name: Install dependencies
+      run: yarn
+
+    - name: Run tests
+      run: yarn test
