@@ -13,6 +13,10 @@ describe("transformJsonIds", () => {
       "Post#111": "mapped_222",
       "Post#333": "mapped_444",
       "Comment#555": "mapped_666",
+      "User#100": "mapped_100",
+      "User#200": "mapped_200",
+      "Post#999": "mapped_999",
+      "Product#42": "mapped_42",
     };
 
     return entries.map((entry) => idMap[`${entry.typename}#${entry.id}`]);
@@ -294,5 +298,221 @@ describe("transformJsonIds", () => {
     });
 
     expect(result).toEqual(expected);
+  });
+
+  // Tests for number type ID support
+  test("ID transformation for number type IDs", async () => {
+    const input = {
+      users: [
+        { id: 100, name: "John" },
+        { id: 200, name: "Jane" },
+      ],
+    };
+
+    const expected = {
+      users: [
+        { id: "mapped_100", name: "John" },
+        { id: "mapped_200", name: "Jane" },
+      ],
+    };
+
+    const result = await transformJsonIds(input, {
+      pathTypeMap: {
+        "$.users[*]": "User",
+      },
+      batchIds: mockBatchIds,
+    });
+
+    expect(result).toEqual(expected);
+  });
+
+  test("ID transformation for mixed string and number type IDs", async () => {
+    const input = {
+      users: [
+        { id: 100, name: "John" },
+        { id: "123", name: "Alice" },
+      ],
+      posts: [{ id: 999, title: "Hello World" }],
+    };
+
+    const expected = {
+      users: [
+        { id: "mapped_100", name: "John" },
+        { id: "mapped_456", name: "Alice" },
+      ],
+      posts: [{ id: "mapped_999", title: "Hello World" }],
+    };
+
+    const result = await transformJsonIds(input, {
+      pathTypeMap: {
+        "$.users[*]": "User",
+        "$.posts[*]": "Post",
+      },
+      batchIds: mockBatchIds,
+    });
+
+    expect(result).toEqual(expected);
+  });
+
+  test("Retain original ID when includeOriginalId is true for number ID", async () => {
+    const input = {
+      users: [{ id: 100, name: "John" }],
+    };
+
+    const expected = {
+      users: [
+        {
+          id: "mapped_100",
+          "@id": 100,
+          name: "John",
+        },
+      ],
+    };
+
+    const result = await transformJsonIds(input, {
+      pathTypeMap: {
+        "$.users[*]": "User",
+      },
+      batchIds: mockBatchIds,
+      includeOriginalId: true,
+    });
+
+    expect(result).toEqual(expected);
+  });
+
+  test("Number ID transformation for nested objects", async () => {
+    const input = {
+      posts: [
+        {
+          id: 999,
+          title: "Hello World",
+          author: 100,
+          comments: [{ id: "555", text: "Great post!" }],
+        },
+      ],
+    };
+
+    const expected = {
+      posts: [
+        {
+          id: "mapped_999",
+          title: "Hello World",
+          author: "mapped_100",
+          comments: [
+            {
+              id: "mapped_666",
+              text: "Great post!",
+            },
+          ],
+        },
+      ],
+    };
+
+    const result = await transformJsonIds(input, {
+      pathTypeMap: {
+        "$.posts[*]": "Post",
+        "$.posts[*].author": "User",
+        "$.posts[*].comments[*]": "Comment",
+      },
+      batchIds: mockBatchIds,
+    });
+
+    expect(result).toEqual(expected);
+  });
+
+  test("Number ID with custom idPropertyName", async () => {
+    const input = {
+      products: [{ productId: 42, name: "Laptop" }],
+    };
+
+    const expected = {
+      products: [{ productId: "mapped_42", name: "Laptop" }],
+    };
+
+    const result = await transformJsonIds(input, {
+      pathTypeMap: {
+        "$.products[*]": {
+          typename: "Product",
+          idPropertyName: "productId",
+        },
+      },
+      batchIds: mockBatchIds,
+    });
+
+    expect(result).toEqual(expected);
+  });
+
+  test("Number ID with custom original ID property name", async () => {
+    const input = {
+      users: [{ id: 100, name: "John" }],
+    };
+
+    const expected = {
+      users: [
+        {
+          id: "mapped_100",
+          original_id: 100,
+          name: "John",
+        },
+      ],
+    };
+
+    const result = await transformJsonIds(input, {
+      pathTypeMap: {
+        "$.users[*]": "User",
+      },
+      batchIds: mockBatchIds,
+      includeOriginalId: (idPropertyName) => `original_${idPropertyName}`,
+    });
+
+    expect(result).toEqual(expected);
+  });
+
+  test("Direct number ID transformation", async () => {
+    const input = {
+      userId: 100,
+      postId: 999,
+    };
+
+    const expected = {
+      userId: "mapped_100",
+      postId: "mapped_999",
+    };
+
+    const result = await transformJsonIds(input, {
+      pathTypeMap: {
+        "$.userId": "User",
+        "$.postId": "Post",
+      },
+      batchIds: mockBatchIds,
+    });
+
+    expect(result).toEqual(expected);
+  });
+
+  test("Verify batchIds receives correct entries with number IDs", async () => {
+    const mockBatchIdsSpy = vi
+      .fn()
+      .mockResolvedValue(["mapped_100", "mapped_999"]);
+
+    const spyOptions: TransformJsonIdsOptions = {
+      pathTypeMap: {
+        "$.users[*]": "User",
+        "$.posts[*]": "Post",
+      },
+      batchIds: mockBatchIdsSpy,
+    };
+
+    const input = {
+      users: [{ id: 100, name: "John" }],
+      posts: [{ id: 999, title: "Hello" }],
+    };
+
+    await transformJsonIds(input, spyOptions);
+
+    expect(mockBatchIdsSpy).toHaveBeenCalledWith([
+      { id: "100", typename: "User" },
+      { id: "999", typename: "Post" },
+    ]);
   });
 });

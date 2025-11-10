@@ -33,12 +33,12 @@ export type PathTypeMap = Record<string, PathTypeMapReturn | PathTypeMapFn>;
 
 /**
  * A function that dynamically determines the type of an ID based on the object and its path.
- * @param {object | string} obj - The object containing the ID, or the ID itself if it's a string.
+ * @param {object | string | number} obj - The object containing the ID, or the ID itself if it's a string or number.
  * @param {string} path - The JSONPath to the object or ID.
  * @returns {PathTypeMapReturn} The type information for the ID.
  */
 export type PathTypeMapFn = (
-  obj: object | string,
+  obj: object | string | number,
   path: string,
 ) => PathTypeMapReturn;
 
@@ -104,6 +104,7 @@ export type TransformJsonIdsOptions = {
    * prefixed with `@` (e.g., `@id`).
    * If set to a function, the function will be called with the `idPropertyName`
    * to determine the key for storing the original ID.
+   * The original ID type (string or number) is preserved.
    *
    * @example
    * // includeOriginalId: true
@@ -121,8 +122,8 @@ export type TransformJsonIdsOptions = {
 /**
  * Transforms IDs within a JSON object based on a provided path-to-type mapping and a batch ID transformation function.
  *
- * This function traverses the input JSON object, identifies IDs based on the `pathTypeMap`,
- * and then uses the `batchIds` function to transform these IDs.
+ * This function traverses the input JSON object, identifies IDs (string or number) based on the `pathTypeMap`,
+ * and then uses the `batchIds` function to transform these IDs to strings.
  * It supports nested objects, dynamic type mapping, and optional retention of original IDs.
  *
  * @template T - The type of the input JSON object.
@@ -133,10 +134,12 @@ export type TransformJsonIdsOptions = {
  *                                            Values can be a string (typename) or an object with `typename` and `idPropertyName`.
  *                                            A function can also be provided to dynamically determine the typename.
  * @param {BatchIdsFn} options.batchIds - An asynchronous function that takes an array of ID entries ({ id, typename })
+ *                                        where id is always a string (numbers are converted to strings),
  *                                        and returns a Promise resolving to an array of transformed IDs (or null/undefined if not mapped).
  * @param {true | ((idPropertyName: string) => string)} [options.includeOriginalId] - Optional.
  *                                                                                   If `true`, the original ID will be preserved in a new field prefixed with `@`.
  *                                                                                   If a function, it will be called with the `idPropertyName` to determine the new field name.
+ *                                                                                   The original ID type (string or number) is preserved.
  * @returns {Promise<T>} A Promise that resolves to the new JSON object with transformed IDs.
  */
 export async function transformJsonIds<T extends object = object>(
@@ -151,6 +154,7 @@ export async function transformJsonIds<T extends object = object>(
     id: string;
     typename: string;
     idPtr: string; // JSON Pointer to the ID property itself
+    originalId: string | number; // Keep original ID value for includeOriginalId option
   }> = [];
 
   // Iterate over each JSONPath defined in the pathTypeMap.
@@ -167,7 +171,7 @@ export async function transformJsonIds<T extends object = object>(
         }
 
         // Retrieve the object from the full JSON using its JSON Pointer.
-        const obj: Record<string, unknown> | string = jsonPointer.get(
+        const obj: Record<string, unknown> | string | number = jsonPointer.get(
           fullJson,
           objPtr,
         );
@@ -192,24 +196,30 @@ export async function transformJsonIds<T extends object = object>(
           }
         }
 
-        // Extract the ID from the object. If the object itself is a string, use it as the ID.
-        const id = typeof obj === "string" ? obj : obj?.[idPropertyName];
+        // Extract the ID from the object. If the object itself is a string or number, use it as the ID.
+        const id =
+          typeof obj === "string" || typeof obj === "number"
+            ? obj
+            : obj?.[idPropertyName];
 
         // Skip if no ID is found.
-        if (!id) {
+        if (!id && id !== 0) {
           return;
         }
 
         // Construct the JSON Pointer to the ID property.
         const idPtr =
-          typeof obj === "string" ? `${objPtr}` : `${objPtr}/${idPropertyName}`;
+          typeof obj === "string" || typeof obj === "number"
+            ? `${objPtr}`
+            : `${objPtr}/${idPropertyName}`;
 
-        // If the ID is a string, add it to the batch for transformation.
-        if (typeof id === "string") {
+        // If the ID is a string or number, add it to the batch for transformation.
+        if (typeof id === "string" || typeof id === "number") {
           idsToBatch.push({
-            id,
+            id: String(id), // Convert number to string for batchIds function
             typename,
             idPtr,
+            originalId: id, // Keep original ID value (string or number)
           });
         }
       },
@@ -253,12 +263,13 @@ export async function transformJsonIds<T extends object = object>(
         idPtrArray.push(originalIdPropertyName);
 
         // Compile the path segments back into a JSON Pointer for the original ID.
-        // This handles cases where the original ID was a direct string (e.g., "/someId"),
+        // This handles cases where the original ID was a direct string or number (e.g., "/someId"),
         // by effectively adding the original ID property to the parent object.
         const originalIdPtr = jsonPointer.compile(idPtrArray);
 
         // Set the original ID in the full JSON object at the newly constructed pointer.
-        jsonPointer.set(fullJson, originalIdPtr, idsToBatch[i].id);
+        // Use originalId to preserve the original type (string or number).
+        jsonPointer.set(fullJson, originalIdPtr, idsToBatch[i].originalId);
       }
     }
   }
