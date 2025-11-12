@@ -1,44 +1,32 @@
 import jsonPointer from "json-pointer";
 import { JSONPath } from "jsonpath-plus";
-
-const DEFAULT_ID_PROPERTY_NAME = "id";
+import type { Transform } from "./types";
 
 export type Nullable<T> = T | null | undefined;
 
 /**
- * Defines the return type for `PathTypeMap` entries, specifying how an ID's type is determined.
- * It can be a simple string (typename) or an object providing more details like `idPropertyName`.
+ * Defines the return type for `PathTypeMap` entries, specifying the typename of an ID.
+ * It is a string representing the type name (e.g., "User", "Post").
  */
-export type PathTypeMapReturn =
-  | string
-  | {
-      /**
-       * The type name associated with the ID (e.g., "User", "Post").
-       */
-      typename: string;
-
-      /**
-       * The name of the property that holds the ID within the object (e.g., "id", "userId", "productId").
-       * Defaults to "id" if not specified.
-       */
-      idPropertyName?: string;
-    };
+export type PathTypeMapReturn = string;
 
 /**
- * A map where keys are JSONPath expressions and values define the type of the ID.
- * Values can be a string (typename) or an object with `typename` and `idPropertyName`.
+ * A map where keys are JSONPath expressions pointing directly to ID properties,
+ * and values define the typename of the ID.
  * A function can also be provided to dynamically determine the typename.
  */
 export type PathTypeMap = Record<string, PathTypeMapReturn | PathTypeMapFn>;
 
 /**
- * A function that dynamically determines the type of an ID based on the object and its path.
- * @param {object | string} obj - The object containing the ID, or the ID itself if it's a string.
- * @param {string} path - The JSONPath to the object or ID.
- * @returns {PathTypeMapReturn} The type information for the ID.
+ * A function that dynamically determines the type of an ID based on the value, parent object, and path.
+ * @param {string} value - The ID value.
+ * @param {object} parentObj - The parent object containing the ID property.
+ * @param {string} path - The JSONPath to the ID property.
+ * @returns {PathTypeMapReturn} The typename for the ID.
  */
 export type PathTypeMapFn = (
-  obj: object | string,
+  value: string,
+  parentObj: unknown,
   path: string,
 ) => PathTypeMapReturn;
 
@@ -50,74 +38,6 @@ export type BatchIdsFn = (
   entries: Array<{ id: string; typename: string }>,
 ) => Promise<Array<Nullable<string>>>;
 
-export type TransformJsonIdsOptions = {
-  /**
-   * A map where keys are JSONPath expressions and values define the type of the ID.
-   * Values can be a string (typename) or an object with `typename` and `idPropertyName`.
-   * A function can also be provided to dynamically determine the typename.
-   *
-   * @example
-   * // Static mapping
-   * {
-   *   pathTypeMap: {
-   *     "$.users[*]": "User",
-   *     "$.posts[*].author": "User",
-   *   }
-   * }
-   * @example
-   * // Dynamic mapping based on object properties
-   * {
-   *   pathTypeMap: {
-   *     "$.items[*]": (obj) => (obj as { type: string }).type === "user" ? "User" : "Post",
-   *   }
-   * }
-   * @example
-   * // Mapping with custom ID property name
-   * {
-   *   pathTypeMap: {
-   *     "$.products[*]": { typename: "Product", idPropertyName: "productId" },
-   *   }
-   * }
-   */
-  pathTypeMap: PathTypeMap;
-
-  /**
-   * An asynchronous function that takes an array of ID entries ({ id, typename })
-   * and returns a Promise resolving to an array of transformed IDs (or null/undefined if not mapped).
-   *
-   * @example
-   * // Example batchIds function
-   * async (entries) => {
-   *   const idMap = {
-   *     "User#123": "mapped_456",
-   *     "Post#111": "mapped_222",
-   *   };
-   *   return entries.map((entry) => idMap[`${entry.typename}#${entry.id}`] || null);
-   * }
-   */
-  batchIds: BatchIdsFn;
-
-  /**
-   * Specifies whether to preserve the original ID in a separate field.
-   *
-   * If set to `true`, the original ID value will be stored in an additional field
-   * prefixed with `@` (e.g., `@id`).
-   * If set to a function, the function will be called with the `idPropertyName`
-   * to determine the key for storing the original ID.
-   *
-   * @example
-   * // includeOriginalId: true
-   * // Before transformation: { id: 123, name: 'john' }
-   * // After transformation: { id: 'abc123_User', '@id': 123, name: 'john' }
-   *
-   * @example
-   * // includeOriginalId: (idPropertyName) => `__${idPropertyName}`
-   * // Before transformation: { id: 123, name: 'john' }
-   * // After transformation: { id: 'abc123_User', __id: 123, name: 'john' }
-   */
-  includeOriginalId?: true | ((idPropertyName: string) => string);
-};
-
 /**
  * Transforms IDs within a JSON object based on a provided path-to-type mapping and a batch ID transformation function.
  *
@@ -125,30 +45,98 @@ export type TransformJsonIdsOptions = {
  * and then uses the `batchIds` function to transform these IDs.
  * It supports nested objects, dynamic type mapping, and optional retention of original IDs.
  *
- * @template T - The type of the input JSON object.
- * @param {T} input - The JSON object whose IDs are to be transformed. A deep clone is made to avoid modifying the original object.
+ * @template $$Input - The type of the input JSON object.
+ * @param {$$Input} input - The JSON object whose IDs are to be transformed. A deep clone is made to avoid modifying the original object.
  * @param {TransformJsonIdsOptions} options - Configuration options for ID transformation.
  *
- * @param {PathTypeMap} options.pathTypeMap - A map where keys are JSONPath expressions and values define the type of the ID.
- *                                            Values can be a string (typename) or an object with `typename` and `idPropertyName`.
- *                                            A function can also be provided to dynamically determine the typename.
+ * @param {PathTypeMap} options.pathTypeMap - A map where keys are JSONPath expressions pointing directly to ID properties,
+ *                                            and values define the typename of the ID.
+ *                                            A function can also be provided to dynamically determine the typename based on the ID value.
  * @param {BatchIdsFn} options.batchIds - An asynchronous function that takes an array of ID entries ({ id, typename })
  *                                        and returns a Promise resolving to an array of transformed IDs (or null/undefined if not mapped).
- * @param {true | ((idPropertyName: string) => string)} [options.includeOriginalId] - Optional.
- *                                                                                   If `true`, the original ID will be preserved in a new field prefixed with `@`.
- *                                                                                   If a function, it will be called with the `idPropertyName` to determine the new field name.
- * @returns {Promise<T>} A Promise that resolves to the new JSON object with transformed IDs.
+ * @param {string} [options.originalIdPrefix] - Optional prefix for storing original IDs (defaults to '@').
+ *                                              Original IDs are always preserved, this only controls the prefix.
+ *                                              For example, '@' results in '@id', 'original_' results in 'original_id'.
+ * @returns {Promise<$$Input>} A Promise that resolves to the new JSON object with transformed IDs.
  */
-export async function transformJsonIds<T extends object = object>(
-  input: T,
-  options: TransformJsonIdsOptions,
-): Promise<T> {
+export async function transformJsonIds<
+  $$Input extends object,
+  $$PathTypeMap extends PathTypeMap,
+  $$OriginalIdPrefix extends string = "@",
+>(
+  input: $$Input,
+  options: {
+    /**
+     * A map where keys are JSONPath expressions pointing directly to ID properties,
+     * and values define the typename of the ID.
+     * A function can also be provided to dynamically determine the typename based on the ID value and parent object.
+     *
+     * @example
+     * // Static mapping - paths point directly to ID properties
+     * {
+     *   pathTypeMap: {
+     *     "$.users[*].id": "User",
+     *     "$.posts[*].authorId": "User",
+     *     "$.posts[*].id": "Post",
+     *   }
+     * }
+     * @example
+     * // Dynamic mapping based on parent object properties
+     * {
+     *   pathTypeMap: {
+     *     "$.items[*].id": (idValue, parentObj) =>
+     *       (parentObj as { type: string }).type === "user" ? "User" : "Post",
+     *   }
+     * }
+     */
+    pathTypeMap: $$PathTypeMap;
+
+    /**
+     * An asynchronous function that takes an array of ID entries ({ id, typename })
+     * and returns a Promise resolving to an array of transformed IDs (or null/undefined if not mapped).
+     *
+     * @example
+     * // Example batchIds function
+     * async (entries) => {
+     *   const idMap = {
+     *     "User#123": "mapped_456",
+     *     "Post#111": "mapped_222",
+     *   };
+     *   return entries.map((entry) => idMap[`${entry.typename}#${entry.id}`] || null);
+     * }
+     */
+    batchIds: BatchIdsFn;
+
+    /**
+     * Specifies the prefix for storing the original ID in a separate field.
+     * If provided, the original ID value will be stored with this prefix.
+     * (Default: `@`)
+     *
+     * @example
+     * // originalIdPrefix: undefined (uses default '@')
+     * // Before transformation: { id: 123, name: 'john' }
+     * // After transformation: { id: 'abc123_User', '@id': 123, name: 'john' }
+     *
+     * @example
+     * // originalIdPrefix: 'original_'
+     * // Before transformation: { id: 123, name: 'john' }
+     * // After transformation: { id: 'abc123_User', 'original_id': 123, name: 'john' }
+     *
+     * @example
+     * // originalIdPrefix: '__'
+     * // Before transformation: { authorId: 123, name: 'john' }
+     * // After transformation: { authorId: 'abc123_User', '__authorId': 123, name: 'john' }
+     */
+    originalIdPrefix?: $$OriginalIdPrefix;
+  },
+): Promise<Transform<$$Input, $$PathTypeMap, $$OriginalIdPrefix>> {
   // Deep clone the input JSON to avoid modifying the original object.
   const fullJson = structuredClone(input);
 
   // Array to store IDs that need to be batched for transformation.
   const idsToBatch: Array<{
-    id: string;
+    id: string; // String representation of the ID for transformation
+    originalId: string | number; // Original ID value to preserve
     typename: string;
     idPtr: string; // JSON Pointer to the ID property itself
   }> = [];
@@ -158,60 +146,54 @@ export async function transformJsonIds<T extends object = object>(
     JSONPath({
       path: jsonPath,
       json: fullJson,
-      callback: (objPtr: string) => {
-        let pathTypeMapValue = options.pathTypeMap[jsonPath];
-
-        // Skip if the object pointer is null or undefined.
-        if (objPtr === null || objPtr === undefined) {
+      callback: (idPtr: string) => {
+        // Skip if the pointer is null or undefined.
+        if (idPtr === null || idPtr === undefined) {
           return;
         }
 
-        // Retrieve the object from the full JSON using its JSON Pointer.
-        const obj: Record<string, unknown> | string = jsonPointer.get(
-          fullJson,
-          objPtr,
-        );
+        // Retrieve the ID value directly from the full JSON using its JSON Pointer.
+        const idValue = jsonPointer.get(fullJson, idPtr);
 
-        let typename: string;
-        let idPropertyName = DEFAULT_ID_PROPERTY_NAME; // Default ID property name
-
-        // Determine the typename and idPropertyName based on pathTypeMapValue.
-        // If pathTypeMapValue is a function, execute it to get the actual value.
-        if (typeof pathTypeMapValue === "function") {
-          pathTypeMapValue = pathTypeMapValue(obj, jsonPath);
+        // Skip if no ID value is found.
+        if (idValue === null || idValue === undefined) {
+          return;
         }
 
-        // If pathTypeMapValue is a string, it's the typename.
-        // Otherwise, it's an object containing typename and optionally idPropertyName.
-        if (typeof pathTypeMapValue === "string") {
-          typename = pathTypeMapValue;
+        // Convert ID to string if it's a number, skip if it's not a string or number.
+        let idString: string;
+        if (typeof idValue === "string") {
+          idString = idValue;
+        } else if (typeof idValue === "number") {
+          idString = String(idValue);
         } else {
-          typename = pathTypeMapValue.typename;
-          if (pathTypeMapValue.idPropertyName) {
-            idPropertyName = pathTypeMapValue.idPropertyName;
-          }
-        }
-
-        // Extract the ID from the object. If the object itself is a string, use it as the ID.
-        const id = typeof obj === "string" ? obj : obj?.[idPropertyName];
-
-        // Skip if no ID is found.
-        if (!id) {
           return;
         }
 
-        // Construct the JSON Pointer to the ID property.
-        const idPtr =
-          typeof obj === "string" ? `${objPtr}` : `${objPtr}/${idPropertyName}`;
+        // Extract the parent object by removing the last segment from the pointer.
+        const idPtrArray = jsonPointer.parse(idPtr);
+        idPtrArray.pop(); // Remove the property name (last segment)
+        const parentPtr = jsonPointer.compile(idPtrArray);
+        const parentObj = jsonPointer.get(fullJson, parentPtr);
 
-        // If the ID is a string, add it to the batch for transformation.
-        if (typeof id === "string") {
-          idsToBatch.push({
-            id,
-            typename,
-            idPtr,
-          });
+        // Determine the typename based on pathTypeMapValue.
+        const pathTypeMapValue = options.pathTypeMap[jsonPath];
+        let typename: string;
+
+        // If pathTypeMapValue is a function, execute it to get the typename.
+        if (typeof pathTypeMapValue === "function") {
+          typename = pathTypeMapValue(idString, parentObj, jsonPath);
+        } else {
+          typename = pathTypeMapValue;
         }
+
+        // Add the ID to the batch for transformation.
+        idsToBatch.push({
+          id: idString,
+          originalId: idValue, // Store original ID (preserves number type)
+          typename,
+          idPtr,
+        });
       },
       flatten: true, // Flatten the results to get direct pointers
       wrap: false, // Do not wrap results in an array
@@ -234,35 +216,31 @@ export async function transformJsonIds<T extends object = object>(
     if (mappedId !== null && mappedId !== undefined) {
       jsonPointer.set(fullJson, idPtr, mappedId);
 
-      // If includeOriginalId option is enabled, preserve the original ID.
-      if (options.includeOriginalId) {
-        // Parse the JSON Pointer to get an array of path segments.
-        const idPtrArray = jsonPointer.parse(idPtr);
+      // Parse the JSON Pointer to get an array of path segments.
+      const idPtrArray = jsonPointer.parse(idPtr);
 
-        // Extract the actual property name of the ID (e.g., "id", "userId").
-        // This also removes the last segment from the array.
-        const idPropertyName = idPtrArray.pop() as string;
+      // Extract the actual property name of the ID (e.g., "id", "userId").
+      // This also removes the last segment from the array.
+      const idPropertyName = idPtrArray.pop() as string;
 
-        // Determine the property name for the original ID based on the option.
-        const originalIdPropertyName =
-          typeof options.includeOriginalId === "function"
-            ? options.includeOriginalId(idPropertyName)
-            : `@${idPropertyName}`;
+      // Determine the prefix for the original ID property name.
+      const originalIdPrefix = options.originalIdPrefix ?? "@";
+      const originalIdPropertyName = `${originalIdPrefix}${idPropertyName}`;
 
-        // Add the new original ID property name to the path segments.
-        idPtrArray.push(originalIdPropertyName);
+      // Add the new original ID property name to the path segments.
+      idPtrArray.push(originalIdPropertyName);
 
-        // Compile the path segments back into a JSON Pointer for the original ID.
-        // This handles cases where the original ID was a direct string (e.g., "/someId"),
-        // by effectively adding the original ID property to the parent object.
-        const originalIdPtr = jsonPointer.compile(idPtrArray);
+      // Compile the path segments back into a JSON Pointer for the original ID.
+      // This handles cases where the original ID was a direct string (e.g., "/someId"),
+      // by effectively adding the original ID property to the parent object.
+      const originalIdPtr = jsonPointer.compile(idPtrArray);
 
-        // Set the original ID in the full JSON object at the newly constructed pointer.
-        jsonPointer.set(fullJson, originalIdPtr, idsToBatch[i].id);
-      }
+      // Set the original ID in the full JSON object at the newly constructed pointer.
+      // Use originalId to preserve the original type (number or string).
+      jsonPointer.set(fullJson, originalIdPtr, idsToBatch[i].originalId);
     }
   }
 
   // Return the JSON object with transformed IDs.
-  return fullJson;
+  return fullJson as Transform<$$Input, $$PathTypeMap, $$OriginalIdPrefix>;
 }

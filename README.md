@@ -2,6 +2,16 @@
 
 `json-id-transformer` is a flexible utility library designed to batch transform specific IDs within a JSON object. It allows you to specify the location of IDs to be transformed using JSONPath and inject custom ID transformation logic via an external function, making it highly adaptable for integration with various backend systems.
 
+## Features
+
+- ✨ **Type-safe transformations** - Full TypeScript support with accurate type inference
+- 🎯 **JSONPath-based targeting** - Precisely specify which IDs to transform using JSONPath expressions
+- 🔄 **Batch processing** - Efficiently transform multiple IDs in a single operation
+- 🔢 **Number ID support** - Automatically handles both string and number IDs
+- 📝 **Original ID preservation** - Always preserves original IDs with customizable prefixes
+- 🎨 **Dynamic type mapping** - Determine ID types based on context or ID values
+- 🚀 **Zero dependencies** - Lightweight and fast (only `json-pointer` and `jsonpath-plus`)
+
 ## Installation
 
 You can install the package using npm or yarn:
@@ -51,17 +61,17 @@ async function main() {
   };
 
   const pathTypeMap: PathTypeMap = {
-    "$.users[*]": "User", // Transform 'id' field of objects in 'users' array as 'User' type
+    "$.users[*].id": "User", // Transform 'id' field of objects in 'users' array as 'User' type
     "$.posts[*].authorId": "User", // Transform 'authorId' field of each post in 'posts' array as 'User' type
-    "$.posts[*]": { typename: "Post", idPropertyName: "id" }, // Transform 'id' field of each post in 'posts' array as 'Post' type
-    "$.posts[*].comments[*]": "Comment", // Transform 'id' field of objects in 'comments' array as 'Comment' type
+    "$.posts[*].id": "Post", // Transform 'id' field of each post in 'posts' array as 'Post' type
+    "$.posts[*].comments[*].id": "Comment", // Transform 'id' field of objects in 'comments' array as 'Comment' type
     "$.profile.userId": "User", // Transform 'userId' field of 'profile' object as 'User' type
   };
 
   const transformedJson = await transformJsonIds(inputJson, {
     pathTypeMap,
     batchIds: mockBatchIds,
-    includeOriginalId: true, // Preserve original ID in '@id' field
+    // originalIdPrefix: "original_", // Optional: defaults to '@' if not specified
   });
 
   console.log(JSON.stringify(transformedJson, null, 2));
@@ -120,36 +130,36 @@ The main function for transforming IDs within a JSON object.
 
 #### `options.pathTypeMap: PathTypeMap`
 
-A map where keys are JSONPath expressions and values define the type of the ID to be transformed.
+A map where keys are JSONPath expressions pointing directly to ID properties, and values define the typename of the ID to be transformed.
 
-*   **String Value**: Directly specifies the `typename` for the ID at the given JSONPath. The `idPropertyName` defaults to `"id"`.
+*   **String Value**: Directly specifies the `typename` for the ID at the given JSONPath.
     ```typescript
     {
       // 'id' field of objects in 'users' array will be treated as 'User' type
-      "$.users[*]": "User"
-    }
-    ```
-*   **Object Value**: Allows explicit specification of `typename` along with `idPropertyName`.
-    ```typescript
-    {
+      "$.users[*].id": "User",
       // 'productId' field of objects in 'products' array will be treated as 'Product' type
-      "$.products[*]": { typename: "Product", idPropertyName: "productId" }
+      "$.products[*].productId": "Product"
     }
     ```
-*   **Function Value**: Used when the `typename` needs to be determined dynamically based on the object's content. The function receives the current object and its JSONPath as arguments.
+*   **Function Value**: Used when the `typename` needs to be determined dynamically. The function receives the ID value, the parent object containing the ID, and the JSONPath as arguments.
     ```typescript
     {
-      "$.items[*]": (obj) => obj.type === "user" ? "User" : "Post"
+      // Determine typename based on parent object properties
+      "$.items[*].id": (idValue, parentObj) =>
+        (parentObj as { type: string }).type === "user" ? "User" : "Post"
     }
     ```
 
     ```typescript
     {
-      "$.items[*]": (obj) => (
-        obj.type === "user"
-          ? { typename: "User", idPropertyName: "userId" }
-          : { typename: "Post", idPropertyName: "postId" }
-      )
+      // Use both ID value and parent object for complex logic
+      "$.items[*].id": (idValue, parentObj) => {
+        const parent = parentObj as { type: string; verified?: boolean };
+        if (parent.type === "user" && parent.verified) {
+          return "VerifiedUser";
+        }
+        return parent.type === "user" ? "User" : "Post";
+      }
     }
     ```
 
@@ -171,16 +181,59 @@ const mockBatchIds: BatchIdsFn = async (entries) => {
 };
 ```
 
-#### `options.includeOriginalId?: true | ((idPropertyName: string) => string)`
+#### `options.originalIdPrefix?: string`
 
-Configures whether to preserve the original ID in a separate field within the transformed object.
+Configures the prefix for preserving the original ID in a separate field within the transformed object.
 
-*   `true`: The original ID will be added to a new field prefixed with `@` (e.g., if `id` is transformed to `mapped_123`, the original `id` will be stored in `@id`).
-*   `((idPropertyName: string) => string)`: Providing a function allows dynamic determination of the field name for storing the original ID. The function receives the original ID property name (e.g., `"id"`, `"userId"`) as an argument.
+**Note**: Original IDs are always preserved. This option only controls the prefix used.
+
+*   Default: `"@"` - The original ID will be stored with `@` prefix (e.g., if `id` is transformed to `mapped_123`, the original `id` will be stored in `@id`).
+*   Custom string: Providing a custom string will use that as the prefix for storing the original ID.
     ```typescript
-    includeOriginalId: (idPropName) => `original_${idPropName}`
+    originalIdPrefix: "original_"
     // The original 'id' field will be stored in 'original_id'.
+    // The original 'userId' field will be stored in 'original_userId'.
     ```
+
+    ```typescript
+    originalIdPrefix: "__"
+    // The original 'id' field will be stored in '__id'.
+    ```
+
+### Working with Number IDs
+
+The library automatically handles both string and number IDs. When a number ID is encountered:
+- It's converted to a string for the transformation process
+- The `batchIds` function receives the ID as a string
+- The **original number type is preserved** in the original ID field
+
+```typescript
+const input = {
+  users: [
+    { id: 123, name: "John" },  // number ID
+    { id: 789, name: "Jane" },  // number ID
+  ],
+};
+
+const result = await transformJsonIds(input, {
+  pathTypeMap: {
+    "$.users[*].id": "User",
+  },
+  batchIds: async (entries) => {
+    // entries[0].id will be "123" (string)
+    // entries[1].id will be "789" (string)
+    return entries.map(e => `transformed_${e.id}`);
+  },
+});
+
+// Result:
+// {
+//   users: [
+//     { id: "transformed_123", "@id": 123, name: "John" },  // @id is number
+//     { id: "transformed_789", "@id": 789, name: "Jane" },  // @id is number
+//   ]
+// }
+```
 
 ## Development
 
