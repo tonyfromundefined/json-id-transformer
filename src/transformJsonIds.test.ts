@@ -1,9 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import {
-  type BatchIdsFn,
-  type TransformJsonIdsOptions,
-  transformJsonIds,
-} from "./transformJsonIds";
+import { type BatchIdsFn, transformJsonIds } from "./transformJsonIds";
 
 describe("transformJsonIds", () => {
   const mockBatchIds: BatchIdsFn = async (entries) => {
@@ -190,20 +186,18 @@ describe("transformJsonIds", () => {
       .fn()
       .mockResolvedValue(["mapped_456", "mapped_222"]);
 
-    const spyOptions: TransformJsonIdsOptions = {
-      pathTypeMap: {
-        "$.users[*].id": "User",
-        "$.posts[*].id": "Post",
-      },
-      batchIds: mockBatchIdsSpy,
-    };
-
     const input = {
       users: [{ id: "123", name: "John" }],
       posts: [{ id: "111", title: "Hello" }],
     };
 
-    await transformJsonIds(input, spyOptions);
+    await transformJsonIds(input, {
+      pathTypeMap: {
+        "$.users[*].id": "User",
+        "$.posts[*].id": "Post",
+      },
+      batchIds: mockBatchIdsSpy,
+    });
 
     expect(mockBatchIdsSpy).toHaveBeenCalledWith([
       { id: "123", typename: "User" },

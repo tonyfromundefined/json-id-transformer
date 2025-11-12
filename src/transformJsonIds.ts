@@ -25,7 +25,7 @@ export type PathTypeMap = Record<string, PathTypeMapReturn | PathTypeMapFn>;
  */
 export type PathTypeMapFn = (
   value: string,
-  parentObj: object,
+  parentObj: unknown,
   path: string,
 ) => PathTypeMapReturn;
 
@@ -37,71 +37,6 @@ export type BatchIdsFn = (
   entries: Array<{ id: string; typename: string }>,
 ) => Promise<Array<Nullable<string>>>;
 
-export type TransformJsonIdsOptions = {
-  /**
-   * A map where keys are JSONPath expressions pointing directly to ID properties,
-   * and values define the typename of the ID.
-   * A function can also be provided to dynamically determine the typename based on the ID value and parent object.
-   *
-   * @example
-   * // Static mapping - paths point directly to ID properties
-   * {
-   *   pathTypeMap: {
-   *     "$.users[*].id": "User",
-   *     "$.posts[*].authorId": "User",
-   *     "$.posts[*].id": "Post",
-   *   }
-   * }
-   * @example
-   * // Dynamic mapping based on parent object properties
-   * {
-   *   pathTypeMap: {
-   *     "$.items[*].id": (idValue, parentObj) =>
-   *       (parentObj as { type: string }).type === "user" ? "User" : "Post",
-   *   }
-   * }
-   */
-  pathTypeMap: PathTypeMap;
-
-  /**
-   * An asynchronous function that takes an array of ID entries ({ id, typename })
-   * and returns a Promise resolving to an array of transformed IDs (or null/undefined if not mapped).
-   *
-   * @example
-   * // Example batchIds function
-   * async (entries) => {
-   *   const idMap = {
-   *     "User#123": "mapped_456",
-   *     "Post#111": "mapped_222",
-   *   };
-   *   return entries.map((entry) => idMap[`${entry.typename}#${entry.id}`] || null);
-   * }
-   */
-  batchIds: BatchIdsFn;
-
-  /**
-   * Specifies the prefix for storing the original ID in a separate field.
-   * If provided, the original ID value will be stored with this prefix.
-   * (Default: `@`)
-   *
-   * @example
-   * // originalIdPrefix: undefined (uses default '@')
-   * // Before transformation: { id: 123, name: 'john' }
-   * // After transformation: { id: 'abc123_User', '@id': 123, name: 'john' }
-   *
-   * @example
-   * // originalIdPrefix: 'original_'
-   * // Before transformation: { id: 123, name: 'john' }
-   * // After transformation: { id: 'abc123_User', 'original_id': 123, name: 'john' }
-   *
-   * @example
-   * // originalIdPrefix: '__'
-   * // Before transformation: { authorId: 123, name: 'john' }
-   * // After transformation: { authorId: 'abc123_User', '__authorId': 123, name: 'john' }
-   */
-  originalIdPrefix?: string;
-};
-
 /**
  * Transforms IDs within a JSON object based on a provided path-to-type mapping and a batch ID transformation function.
  *
@@ -109,8 +44,8 @@ export type TransformJsonIdsOptions = {
  * and then uses the `batchIds` function to transform these IDs.
  * It supports nested objects, dynamic type mapping, and optional retention of original IDs.
  *
- * @template T - The type of the input JSON object.
- * @param {T} input - The JSON object whose IDs are to be transformed. A deep clone is made to avoid modifying the original object.
+ * @template $$Input - The type of the input JSON object.
+ * @param {$$Input} input - The JSON object whose IDs are to be transformed. A deep clone is made to avoid modifying the original object.
  * @param {TransformJsonIdsOptions} options - Configuration options for ID transformation.
  *
  * @param {PathTypeMap} options.pathTypeMap - A map where keys are JSONPath expressions pointing directly to ID properties,
@@ -121,12 +56,79 @@ export type TransformJsonIdsOptions = {
  * @param {string} [options.originalIdPrefix] - Optional prefix for storing original IDs (defaults to '@').
  *                                              Original IDs are always preserved, this only controls the prefix.
  *                                              For example, '@' results in '@id', 'original_' results in 'original_id'.
- * @returns {Promise<T>} A Promise that resolves to the new JSON object with transformed IDs.
+ * @returns {Promise<$$Input>} A Promise that resolves to the new JSON object with transformed IDs.
  */
-export async function transformJsonIds<T extends object = object>(
-  input: T,
-  options: TransformJsonIdsOptions,
-): Promise<T> {
+export async function transformJsonIds<
+  $$Input extends object,
+  $$PathTypeMap extends PathTypeMap,
+  $$OriginalIdPrefix extends string = "@",
+>(
+  input: $$Input,
+  options: {
+    /**
+     * A map where keys are JSONPath expressions pointing directly to ID properties,
+     * and values define the typename of the ID.
+     * A function can also be provided to dynamically determine the typename based on the ID value and parent object.
+     *
+     * @example
+     * // Static mapping - paths point directly to ID properties
+     * {
+     *   pathTypeMap: {
+     *     "$.users[*].id": "User",
+     *     "$.posts[*].authorId": "User",
+     *     "$.posts[*].id": "Post",
+     *   }
+     * }
+     * @example
+     * // Dynamic mapping based on parent object properties
+     * {
+     *   pathTypeMap: {
+     *     "$.items[*].id": (idValue, parentObj) =>
+     *       (parentObj as { type: string }).type === "user" ? "User" : "Post",
+     *   }
+     * }
+     */
+    pathTypeMap: $$PathTypeMap;
+
+    /**
+     * An asynchronous function that takes an array of ID entries ({ id, typename })
+     * and returns a Promise resolving to an array of transformed IDs (or null/undefined if not mapped).
+     *
+     * @example
+     * // Example batchIds function
+     * async (entries) => {
+     *   const idMap = {
+     *     "User#123": "mapped_456",
+     *     "Post#111": "mapped_222",
+     *   };
+     *   return entries.map((entry) => idMap[`${entry.typename}#${entry.id}`] || null);
+     * }
+     */
+    batchIds: BatchIdsFn;
+
+    /**
+     * Specifies the prefix for storing the original ID in a separate field.
+     * If provided, the original ID value will be stored with this prefix.
+     * (Default: `@`)
+     *
+     * @example
+     * // originalIdPrefix: undefined (uses default '@')
+     * // Before transformation: { id: 123, name: 'john' }
+     * // After transformation: { id: 'abc123_User', '@id': 123, name: 'john' }
+     *
+     * @example
+     * // originalIdPrefix: 'original_'
+     * // Before transformation: { id: 123, name: 'john' }
+     * // After transformation: { id: 'abc123_User', 'original_id': 123, name: 'john' }
+     *
+     * @example
+     * // originalIdPrefix: '__'
+     * // Before transformation: { authorId: 123, name: 'john' }
+     * // After transformation: { authorId: 'abc123_User', '__authorId': 123, name: 'john' }
+     */
+    originalIdPrefix?: $$OriginalIdPrefix;
+  },
+): Promise<$$Input> {
   // Deep clone the input JSON to avoid modifying the original object.
   const fullJson = structuredClone(input);
 

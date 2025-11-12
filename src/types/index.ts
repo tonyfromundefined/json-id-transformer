@@ -1,1 +1,1 @@
-export * from "./SetPath";
+export * from "./SetJSONPathValue";
