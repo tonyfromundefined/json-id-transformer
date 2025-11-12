@@ -118,9 +118,9 @@ export type TransformJsonIdsOptions = {
  *                                            A function can also be provided to dynamically determine the typename based on the ID value.
  * @param {BatchIdsFn} options.batchIds - An asynchronous function that takes an array of ID entries ({ id, typename })
  *                                        and returns a Promise resolving to an array of transformed IDs (or null/undefined if not mapped).
- * @param {true | string} [options.originalIdPrefix] - Optional.
- *                                                     If `true`, the original ID will be preserved in a new field prefixed with `@`.
- *                                                     If a string, that string will be used as the prefix.
+ * @param {string} [options.originalIdPrefix] - Optional prefix for storing original IDs (defaults to '@').
+ *                                              Original IDs are always preserved, this only controls the prefix.
+ *                                              For example, '@' results in '@id', 'original_' results in 'original_id'.
  * @returns {Promise<T>} A Promise that resolves to the new JSON object with transformed IDs.
  */
 export async function transformJsonIds<T extends object = object>(

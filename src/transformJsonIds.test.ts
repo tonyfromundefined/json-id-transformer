@@ -231,7 +231,7 @@ describe("transformJsonIds", () => {
 
     expect(result).toEqual(expected);
   });
-  test("Retain original ID when originalIdPrefix is true for direct string ID", async () => {
+  test("Retain original ID with default prefix for direct string ID", async () => {
     const input = {
       someId: "123",
     };

@@ -61,7 +61,7 @@ async function main() {
   const transformedJson = await transformJsonIds(inputJson, {
     pathTypeMap,
     batchIds: mockBatchIds,
-    originalIdPrefix: true, // Preserve original ID with '@' prefix (e.g., '@id')
+    // originalIdPrefix: "original_", // Optional: defaults to '@' if not specified
   });
 
   console.log(JSON.stringify(transformedJson, null, 2));
@@ -171,12 +171,14 @@ const mockBatchIds: BatchIdsFn = async (entries) => {
 };
 ```
 
-#### `options.originalIdPrefix?: true | string`
+#### `options.originalIdPrefix?: string`
 
 Configures the prefix for preserving the original ID in a separate field within the transformed object.
 
-*   `true`: The original ID will be added to a new field prefixed with `@` (e.g., if `id` is transformed to `mapped_123`, the original `id` will be stored in `@id`).
-*   `string`: Providing a custom string will use that as the prefix for storing the original ID.
+**Note**: Original IDs are always preserved. This option only controls the prefix used.
+
+*   Default: `"@"` - The original ID will be stored with `@` prefix (e.g., if `id` is transformed to `mapped_123`, the original `id` will be stored in `@id`).
+*   Custom string: Providing a custom string will use that as the prefix for storing the original ID.
     ```typescript
     originalIdPrefix: "original_"
     // The original 'id' field will be stored in 'original_id'.
