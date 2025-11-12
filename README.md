@@ -2,6 +2,16 @@
 
 `json-id-transformer` is a flexible utility library designed to batch transform specific IDs within a JSON object. It allows you to specify the location of IDs to be transformed using JSONPath and inject custom ID transformation logic via an external function, making it highly adaptable for integration with various backend systems.
 
+## Features
+
+- ✨ **Type-safe transformations** - Full TypeScript support with accurate type inference
+- 🎯 **JSONPath-based targeting** - Precisely specify which IDs to transform using JSONPath expressions
+- 🔄 **Batch processing** - Efficiently transform multiple IDs in a single operation
+- 🔢 **Number ID support** - Automatically handles both string and number IDs
+- 📝 **Original ID preservation** - Always preserves original IDs with customizable prefixes
+- 🎨 **Dynamic type mapping** - Determine ID types based on context or ID values
+- 🚀 **Zero dependencies** - Lightweight and fast (only `json-pointer` and `jsonpath-plus`)
+
 ## Installation
 
 You can install the package using npm or yarn:
@@ -189,6 +199,41 @@ Configures the prefix for preserving the original ID in a separate field within 
     originalIdPrefix: "__"
     // The original 'id' field will be stored in '__id'.
     ```
+
+### Working with Number IDs
+
+The library automatically handles both string and number IDs. When a number ID is encountered:
+- It's converted to a string for the transformation process
+- The `batchIds` function receives the ID as a string
+- The **original number type is preserved** in the original ID field
+
+```typescript
+const input = {
+  users: [
+    { id: 123, name: "John" },  // number ID
+    { id: 789, name: "Jane" },  // number ID
+  ],
+};
+
+const result = await transformJsonIds(input, {
+  pathTypeMap: {
+    "$.users[*].id": "User",
+  },
+  batchIds: async (entries) => {
+    // entries[0].id will be "123" (string)
+    // entries[1].id will be "789" (string)
+    return entries.map(e => `transformed_${e.id}`);
+  },
+});
+
+// Result:
+// {
+//   users: [
+//     { id: "transformed_123", "@id": 123, name: "John" },  // @id is number
+//     { id: "transformed_789", "@id": 789, name: "Jane" },  // @id is number
+//   ]
+// }
+```
 
 ## Development
 

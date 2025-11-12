@@ -39,7 +39,8 @@
   "scripts": {
     "build": "bunchee",
     "release": "changeset publish",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "json-pointer": "^0.6.2",

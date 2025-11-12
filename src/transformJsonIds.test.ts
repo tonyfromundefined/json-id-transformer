@@ -303,4 +303,129 @@ describe("transformJsonIds", () => {
 
     expect(result).toEqual(expected);
   });
+
+  test("Transform number IDs to strings", async () => {
+    const input = {
+      users: [
+        { id: 123, name: "John" },
+        { id: 789, name: "Jane" },
+      ],
+    };
+
+    const expected = {
+      users: [
+        { id: "mapped_456", "@id": 123, name: "John" },
+        { id: "mapped_101", "@id": 789, name: "Jane" },
+      ],
+    };
+
+    const result = await transformJsonIds(input, {
+      pathTypeMap: {
+        "$.users[*].id": "User",
+      },
+      batchIds: mockBatchIds,
+    });
+
+    expect(result).toEqual(expected);
+  });
+
+  test("Transform nested objects with number IDs", async () => {
+    const input = {
+      posts: [
+        {
+          id: 111,
+          title: "Hello World",
+          authorId: 123,
+          comments: [{ id: 555, text: "Great post!" }],
+        },
+      ],
+    };
+
+    const expected = {
+      posts: [
+        {
+          id: "mapped_222",
+          "@id": 111,
+          title: "Hello World",
+          authorId: "mapped_456",
+          "@authorId": 123,
+          comments: [
+            {
+              id: "mapped_666",
+              "@id": 555,
+              text: "Great post!",
+            },
+          ],
+        },
+      ],
+    };
+
+    const result = await transformJsonIds(input, {
+      pathTypeMap: {
+        "$.posts[*].id": "Post",
+        "$.posts[*].authorId": "User",
+        "$.posts[*].comments[*].id": "Comment",
+      },
+      batchIds: mockBatchIds,
+    });
+
+    expect(result).toEqual(expected);
+  });
+
+  test("Handle mixed string and number IDs", async () => {
+    const input = {
+      items: [
+        { id: 123, type: "user", name: "John" },
+        { id: "789", type: "user", name: "Jane" },
+        { id: 111, type: "post", title: "Hello" },
+      ],
+    };
+
+    const expected = {
+      items: [
+        { id: "mapped_456", "@id": 123, type: "user", name: "John" },
+        { id: "mapped_101", "@id": "789", type: "user", name: "Jane" },
+        { id: "mapped_222", "@id": 111, type: "post", title: "Hello" },
+      ],
+    };
+
+    const result = await transformJsonIds(input, {
+      pathTypeMap: {
+        "$.items[*].id": (idValue, parentObj) =>
+          (parentObj as { type: string }).type === "user" ? "User" : "Post",
+      },
+      batchIds: mockBatchIds,
+    });
+
+    expect(result).toEqual(expected);
+  });
+
+  test("Skip non-string and non-number ID values", async () => {
+    const input = {
+      items: [
+        { id: 123, name: "Valid" },
+        { id: true, name: "Invalid boolean" },
+        { id: { nested: "object" }, name: "Invalid object" },
+        { id: [1, 2, 3], name: "Invalid array" },
+      ],
+    };
+
+    const expected = {
+      items: [
+        { id: "mapped_456", "@id": 123, name: "Valid" },
+        { id: true, name: "Invalid boolean" },
+        { id: { nested: "object" }, name: "Invalid object" },
+        { id: [1, 2, 3], name: "Invalid array" },
+      ],
+    };
+
+    const result = await transformJsonIds(input, {
+      pathTypeMap: {
+        "$.items[*].id": "User",
+      },
+      batchIds: mockBatchIds,
+    });
+
+    expect(result).toEqual(expected);
+  });
 });

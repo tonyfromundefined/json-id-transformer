@@ -135,7 +135,8 @@ export async function transformJsonIds<
 
   // Array to store IDs that need to be batched for transformation.
   const idsToBatch: Array<{
-    id: string;
+    id: string; // String representation of the ID for transformation
+    originalId: string | number; // Original ID value to preserve
     typename: string;
     idPtr: string; // JSON Pointer to the ID property itself
   }> = [];
@@ -154,8 +155,18 @@ export async function transformJsonIds<
         // Retrieve the ID value directly from the full JSON using its JSON Pointer.
         const idValue = jsonPointer.get(fullJson, idPtr);
 
-        // Skip if no ID value is found or if it's not a string.
-        if (!idValue || typeof idValue !== "string") {
+        // Skip if no ID value is found.
+        if (idValue === null || idValue === undefined) {
+          return;
+        }
+
+        // Convert ID to string if it's a number, skip if it's not a string or number.
+        let idString: string;
+        if (typeof idValue === "string") {
+          idString = idValue;
+        } else if (typeof idValue === "number") {
+          idString = String(idValue);
+        } else {
           return;
         }
 
@@ -171,14 +182,15 @@ export async function transformJsonIds<
 
         // If pathTypeMapValue is a function, execute it to get the typename.
         if (typeof pathTypeMapValue === "function") {
-          typename = pathTypeMapValue(idValue, parentObj, jsonPath);
+          typename = pathTypeMapValue(idString, parentObj, jsonPath);
         } else {
           typename = pathTypeMapValue;
         }
 
         // Add the ID to the batch for transformation.
         idsToBatch.push({
-          id: idValue,
+          id: idString,
+          originalId: idValue, // Store original ID (preserves number type)
           typename,
           idPtr,
         });
@@ -224,7 +236,8 @@ export async function transformJsonIds<
       const originalIdPtr = jsonPointer.compile(idPtrArray);
 
       // Set the original ID in the full JSON object at the newly constructed pointer.
-      jsonPointer.set(fullJson, originalIdPtr, idsToBatch[i].id);
+      // Use originalId to preserve the original type (number or string).
+      jsonPointer.set(fullJson, originalIdPtr, idsToBatch[i].originalId);
     }
   }
 
