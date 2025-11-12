@@ -78,6 +78,7 @@ describe("transformJsonIds", () => {
       },
       batchIds: mockBatchIds,
     });
+
     expect(result).toEqual(expected);
   });
 

@@ -1,5 +1,6 @@
 import jsonPointer from "json-pointer";
 import { JSONPath } from "jsonpath-plus";
+import type { Transform } from "./types";
 
 export type Nullable<T> = T | null | undefined;
 
@@ -128,7 +129,7 @@ export async function transformJsonIds<
      */
     originalIdPrefix?: $$OriginalIdPrefix;
   },
-): Promise<$$Input> {
+): Promise<Transform<$$Input, $$PathTypeMap, $$OriginalIdPrefix>> {
   // Deep clone the input JSON to avoid modifying the original object.
   const fullJson = structuredClone(input);
 
@@ -228,5 +229,5 @@ export async function transformJsonIds<
   }
 
   // Return the JSON object with transformed IDs.
-  return fullJson;
+  return fullJson as Transform<$$Input, $$PathTypeMap, $$OriginalIdPrefix>;
 }
