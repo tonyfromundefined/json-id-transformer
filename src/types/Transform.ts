@@ -11,7 +11,7 @@
 type TransformPath<
   T,
   Path extends string,
-  Prefix extends string = "@",
+  Prefix extends string,
 > = Path extends `$.${infer Rest}` ? ApplyTransform<T, Rest, Prefix> : T;
 
 /**
@@ -39,14 +39,14 @@ type TransformPath<
 type ApplyTransform<
   T,
   Path extends string,
-  Prefix extends string = "@",
+  Prefix extends string,
 > = Path extends `${
   infer Key // Case 1: Array wildcard with nested path - items[*].id
 }[*].${infer Rest}`
   ? {
       [K in keyof T]: K extends Key
         ? T[K] extends readonly any[]
-          ? ApplyTransform<T[K][number], Rest>[]
+          ? ApplyTransform<T[K][number], Rest, Prefix>[]
           : T[K]
         : T[K];
     }
@@ -66,7 +66,7 @@ type ApplyTransform<
       ? {
           [K in keyof T]: K extends Key
             ? T[K] extends object
-              ? ApplyTransform<T[K], Rest>
+              ? ApplyTransform<T[K], Rest, Prefix>
               : T[K]
             : T[K];
         }

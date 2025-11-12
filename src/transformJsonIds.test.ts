@@ -1,4 +1,9 @@
 import { describe, expect, test, vi } from "vitest";
+import {
+  BatchIdsError,
+  BatchIdsMismatchError,
+  PathTypeMapFnError,
+} from "./errors";
 import { type BatchIdsFn, transformJsonIds } from "./transformJsonIds";
 
 describe("transformJsonIds", () => {
@@ -427,5 +432,147 @@ describe("transformJsonIds", () => {
     });
 
     expect(result).toEqual(expected);
+  });
+
+  test("Error handling: batchIds throws error", async () => {
+    const failingBatchIds: BatchIdsFn = async () => {
+      throw new Error("Network error");
+    };
+
+    const input = {
+      users: [{ id: "123", name: "John" }],
+    };
+
+    await expect(
+      transformJsonIds(input, {
+        pathTypeMap: {
+          "$.users[*].id": "User",
+        },
+        batchIds: failingBatchIds,
+      }),
+    ).rejects.toThrow(BatchIdsError);
+  });
+
+  test("Error handling: batchIds returns mismatched array length", async () => {
+    const mismatchedBatchIds: BatchIdsFn = async () => {
+      // Returns fewer results than expected
+      return ["mapped_456"];
+    };
+
+    const input = {
+      users: [{ id: "123", name: "John" }],
+      posts: [{ id: "111", title: "Hello" }],
+    };
+
+    await expect(
+      transformJsonIds(input, {
+        pathTypeMap: {
+          "$.users[*].id": "User",
+          "$.posts[*].id": "Post",
+        },
+        batchIds: mismatchedBatchIds,
+      }),
+    ).rejects.toThrow(BatchIdsMismatchError);
+  });
+
+  test("Empty pathTypeMap returns unchanged object", async () => {
+    const input = {
+      users: [{ id: "123", name: "John" }],
+    };
+
+    const result = await transformJsonIds(input, {
+      pathTypeMap: {},
+      batchIds: mockBatchIds,
+    });
+
+    // Should return unchanged (no original ID fields added)
+    expect(result).toEqual(input);
+  });
+
+  test("Error handling: PathTypeMapFn throws error", async () => {
+    const input = {
+      items: [{ id: "123", type: "user" }],
+    };
+
+    await expect(
+      transformJsonIds(input, {
+        pathTypeMap: {
+          "$.items[*].id": () => {
+            throw new Error("Type determination failed");
+          },
+        },
+        batchIds: mockBatchIds,
+      }),
+    ).rejects.toThrow(PathTypeMapFnError);
+  });
+
+  test("Deduplication: same ID appears multiple times", async () => {
+    const batchIdsSpy = vi.fn().mockResolvedValue(["mapped_456"]);
+
+    const input = {
+      post: {
+        authorId: "123",
+      },
+      comment: {
+        authorId: "123", // Same ID as post.authorId
+      },
+    };
+
+    const expected = {
+      post: {
+        authorId: "mapped_456",
+        "@authorId": "123",
+      },
+      comment: {
+        authorId: "mapped_456",
+        "@authorId": "123",
+      },
+    };
+
+    const result = await transformJsonIds(input, {
+      pathTypeMap: {
+        "$.post.authorId": "User",
+        "$.comment.authorId": "User",
+      },
+      batchIds: batchIdsSpy,
+    });
+
+    expect(result).toEqual(expected);
+    // Should only call batchIds once with one entry (deduplicated)
+    expect(batchIdsSpy).toHaveBeenCalledTimes(1);
+    expect(batchIdsSpy).toHaveBeenCalledWith([{ id: "123", typename: "User" }]);
+  });
+
+  test("Mutate option: modifies original object", async () => {
+    const input = {
+      users: [{ id: "123", name: "John" }],
+    };
+
+    await transformJsonIds(input, {
+      pathTypeMap: {
+        "$.users[*].id": "User",
+      },
+      batchIds: mockBatchIds,
+      mutate: true,
+    });
+
+    // Original object should be modified
+    expect(input.users[0].id).toBe("mapped_456");
+  });
+
+  test("Mutate option: false creates clone (default)", async () => {
+    const input = {
+      users: [{ id: "123", name: "John" }],
+    };
+
+    await transformJsonIds(input, {
+      pathTypeMap: {
+        "$.users[*].id": "User",
+      },
+      batchIds: mockBatchIds,
+    });
+
+    // Original object should NOT be modified
+    expect(input.users[0].id).toBe("123");
   });
 });

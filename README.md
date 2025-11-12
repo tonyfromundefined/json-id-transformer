@@ -235,6 +235,102 @@ const result = await transformJsonIds(input, {
 // }
 ```
 
+### Error Handling
+
+The library provides robust error handling with specific error types for different failure scenarios:
+
+```typescript
+import {
+  transformJsonIds,
+  BatchIdsError,
+  BatchIdsMismatchError,
+  InvalidJSONPathError,
+  PathTypeMapFnError,
+  InvalidJSONPointerError,
+} from 'json-id-transformer';
+
+try {
+  const result = await transformJsonIds(input, options);
+} catch (error) {
+  if (error instanceof BatchIdsError) {
+    // The batchIds function threw an error (e.g., network failure)
+    console.error('Failed to transform IDs:', error.cause);
+  } else if (error instanceof BatchIdsMismatchError) {
+    // batchIds returned wrong number of results
+    console.error(`Expected ${error.expected} results, got ${error.received}`);
+  } else if (error instanceof PathTypeMapFnError) {
+    // Dynamic type function threw an error
+    console.error(`Failed to determine type for ${error.idValue} at ${error.path}`);
+  } else if (error instanceof InvalidJSONPathError) {
+    // JSONPath expression is invalid
+    console.error(`Invalid path: ${error.path}`);
+  } else if (error instanceof InvalidJSONPointerError) {
+    // Internal JSON Pointer error (rare)
+    console.error(`Invalid pointer: ${error.pointer}`);
+  }
+}
+```
+
+#### Error Types
+
+- **`BatchIdsError`**: Thrown when the `batchIds` function fails (e.g., network error, API failure)
+- **`BatchIdsMismatchError`**: Thrown when `batchIds` returns an array with incorrect length. Each input ID must have a corresponding result (use `null` for unmapped IDs)
+- **`PathTypeMapFnError`**: Thrown when a dynamic type determination function throws an error
+- **`InvalidJSONPathError`**: Thrown when a JSONPath expression is invalid or fails to parse
+- **`InvalidJSONPointerError`**: Thrown when an internal JSON Pointer operation fails (rare, usually indicates a bug)
+
+### Advanced Options
+
+#### `mutate` Option
+
+By default, `transformJsonIds` creates a deep clone of the input to avoid side effects. For large objects, you can use the `mutate` option to modify the input directly:
+
+```typescript
+const largeInput = {
+  // ... large data structure
+};
+
+// Mutate the original object (faster, but modifies input)
+await transformJsonIds(largeInput, {
+  pathTypeMap: { "$.users[*].id": "User" },
+  batchIds: mockBatchIds,
+  mutate: true, // ⚠️ Modifies largeInput
+});
+
+console.log(largeInput.users[0].id); // Now transformed
+```
+
+**Warning**: Using `mutate: true` modifies the original object. Only use this when you don't need to preserve the original data.
+
+### Deduplication
+
+The library automatically deduplicates IDs before calling `batchIds`. If the same ID appears multiple times with the same typename, it will only be transformed once:
+
+```typescript
+const input = {
+  post: { authorId: "123" },
+  comment: { authorId: "123" }, // Same ID
+};
+
+// batchIds will only be called once with [{ id: "123", typename: "User" }]
+const result = await transformJsonIds(input, {
+  pathTypeMap: {
+    "$.post.authorId": "User",
+    "$.comment.authorId": "User",
+  },
+  batchIds: async (entries) => {
+    console.log(entries.length); // 1 (deduplicated)
+    return entries.map(() => "transformed_123");
+  },
+});
+
+// Both fields get the same transformed value
+// result.post.authorId === "transformed_123"
+// result.comment.authorId === "transformed_123"
+```
+
+This optimization reduces unnecessary API calls and improves performance.
+
 ## Development
 
 ### Running Tests
