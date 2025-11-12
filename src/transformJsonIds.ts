@@ -291,10 +291,13 @@ export async function transformJsonIds<
       // Create unique key for deduplication
       const dedupeKey = `${typename}:${idString}`;
 
+      // Get existing entry or undefined
+      const existingEntry = idsBatchMap.get(dedupeKey);
+
       // Add to map (deduplicates automatically)
-      if (idsBatchMap.has(dedupeKey)) {
+      if (existingEntry) {
         // Add this pointer to existing entry
-        idsBatchMap.get(dedupeKey)!.pointers.push(idPtr);
+        existingEntry.pointers.push(idPtr);
       } else {
         // Create new entry
         idsBatchMap.set(dedupeKey, {
