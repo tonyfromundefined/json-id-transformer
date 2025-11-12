@@ -28,14 +28,14 @@ describe("transformJsonIds", () => {
 
     const expected = {
       users: [
-        { id: "mapped_456", name: "John" },
-        { id: "mapped_101", name: "Jane" },
+        { id: "mapped_456", "@id": "123", name: "John" },
+        { id: "mapped_101", "@id": "789", name: "Jane" },
       ],
     };
 
     const result = await transformJsonIds(input, {
       pathTypeMap: {
-        "$.users[*]": "User",
+        "$.users[*].id": "User",
       },
       batchIds: mockBatchIds,
     });
@@ -59,11 +59,14 @@ describe("transformJsonIds", () => {
       posts: [
         {
           id: "mapped_222",
+          "@id": "111",
           title: "Hello World",
           author: "mapped_456",
+          "@author": "123",
           comments: [
             {
               id: "mapped_666",
+              "@id": "555",
               text: "Great post!",
             },
           ],
@@ -73,9 +76,9 @@ describe("transformJsonIds", () => {
 
     const result = await transformJsonIds(input, {
       pathTypeMap: {
-        "$.posts[*]": "Post",
+        "$.posts[*].id": "Post",
         "$.posts[*].author": "User",
-        "$.posts[*].comments[*]": "Comment",
+        "$.posts[*].comments[*].id": "Comment",
       },
       batchIds: mockBatchIds,
     });
@@ -95,6 +98,7 @@ describe("transformJsonIds", () => {
     const expected = {
       profile: {
         user: "mapped_456",
+        "@user": "123",
         settings: {
           theme: "dark",
         },
@@ -126,7 +130,7 @@ describe("transformJsonIds", () => {
     expect(result).toEqual(expected);
   });
 
-  test("Functional pathTypeMap test", async () => {
+  test("Functional pathTypeMap test with parent object access", async () => {
     const input = {
       items: [
         { id: "123", type: "user", name: "John" },
@@ -136,15 +140,15 @@ describe("transformJsonIds", () => {
 
     const expected = {
       items: [
-        { id: "mapped_456", type: "user", name: "John" },
-        { id: "mapped_222", type: "post", title: "Hello" },
+        { id: "mapped_456", "@id": "123", type: "user", name: "John" },
+        { id: "mapped_222", "@id": "111", type: "post", title: "Hello" },
       ],
     };
 
     const result = await transformJsonIds(input, {
       pathTypeMap: {
-        "$.items[*]": (obj) =>
-          (obj as { type: string }).type === "user" ? "User" : "Post",
+        "$.items[*].id": (idValue, parentObj) =>
+          (parentObj as { type: string }).type === "user" ? "User" : "Post",
       },
       batchIds: mockBatchIds,
     });
@@ -164,7 +168,7 @@ describe("transformJsonIds", () => {
 
     const expected = {
       users: [
-        { id: "mapped_456", name: "John" },
+        { id: "mapped_456", "@id": "123", name: "John" },
         null,
         { id: null, name: "Jane" },
         { id: undefined, name: "Bob" },
@@ -173,7 +177,7 @@ describe("transformJsonIds", () => {
 
     const result = await transformJsonIds(input, {
       pathTypeMap: {
-        "$.users[*]": "User",
+        "$.users[*].id": "User",
       },
       batchIds: mockBatchIds,
     });
@@ -188,8 +192,8 @@ describe("transformJsonIds", () => {
 
     const spyOptions: TransformJsonIdsOptions = {
       pathTypeMap: {
-        "$.users[*]": "User",
-        "$.posts[*]": "Post",
+        "$.users[*].id": "User",
+        "$.posts[*].id": "Post",
       },
       batchIds: mockBatchIdsSpy,
     };
@@ -207,54 +211,27 @@ describe("transformJsonIds", () => {
     ]);
   });
 
-  test("Retain original ID when options.includeOriginalId is true", async () => {
-    const input = {
-      users: [{ id: "123", name: "John" }],
-    };
-
-    const expected = {
-      users: [
-        {
-          id: "mapped_456",
-          "@id": "123", // 원본 ID가 @id 필드로 추가되는지 확인
-          name: "John",
-        },
-      ],
-    };
-
-    const result = await transformJsonIds(input, {
-      pathTypeMap: {
-        "$.users[*]": "User", // typename만 지정
-      },
-      batchIds: mockBatchIds,
-      includeOriginalId: true,
-    });
-
-    expect(result).toEqual(expected);
-  });
-
-  test("Change ID property name using PathTypeMapReturn.idPropertyName", async () => {
+  test("Transform custom ID property name by directly pointing to it", async () => {
     const input = {
       products: [{ productId: "123", name: "Laptop" }],
     };
 
     const expected = {
-      products: [{ productId: "mapped_456", name: "Laptop" }],
+      products: [
+        { productId: "mapped_456", "@productId": "123", name: "Laptop" },
+      ],
     };
 
     const result = await transformJsonIds(input, {
       pathTypeMap: {
-        "$.products[*]": {
-          typename: "User",
-          idPropertyName: "productId",
-        },
+        "$.products[*].productId": "User",
       },
       batchIds: mockBatchIds,
     });
 
     expect(result).toEqual(expected);
   });
-  test("Retain original ID when includeOriginalId is true for direct string ID", async () => {
+  test("Retain original ID when originalIdPrefix is true for direct string ID", async () => {
     const input = {
       someId: "123",
     };
@@ -269,13 +246,12 @@ describe("transformJsonIds", () => {
         "$.someId": "User",
       },
       batchIds: mockBatchIds,
-      includeOriginalId: true,
     });
 
     expect(result).toEqual(expected);
   });
 
-  test("Use custom original ID property name for direct string ID", async () => {
+  test("Use custom original ID prefix for direct string ID", async () => {
     const input = {
       anotherId: "789",
     };
@@ -290,7 +266,44 @@ describe("transformJsonIds", () => {
         "$.anotherId": "User",
       },
       batchIds: mockBatchIds,
-      includeOriginalId: (idPropertyName) => `original_${idPropertyName}`,
+      originalIdPrefix: "original_",
+    });
+
+    expect(result).toEqual(expected);
+  });
+
+  test("Dynamic typename using both ID value and parent object", async () => {
+    const input = {
+      items: [
+        { id: "123", type: "user", verified: true },
+        { id: "789", type: "user", verified: false },
+        { id: "111", type: "post", published: true },
+      ],
+    };
+
+    const expected = {
+      items: [
+        { id: "mapped_456", "@id": "123", type: "user", verified: true },
+        { id: "mapped_101", "@id": "789", type: "user", verified: false },
+        { id: "mapped_222", "@id": "111", type: "post", published: true },
+      ],
+    };
+
+    const result = await transformJsonIds(input, {
+      pathTypeMap: {
+        "$.items[*].id": (idValue, parentObj) => {
+          const parent = parentObj as { type: string; verified?: boolean };
+          // Use both idValue and parent object properties to determine typename
+          if (parent.type === "user" && idValue === "123") {
+            return "User";
+          }
+          if (parent.type === "user" && idValue === "789") {
+            return "User";
+          }
+          return "Post";
+        },
+      },
+      batchIds: mockBatchIds,
     });
 
     expect(result).toEqual(expected);
